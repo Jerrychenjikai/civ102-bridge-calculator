@@ -1,25 +1,97 @@
 # all numbers in mm
 
+from constants import *
+
 def within(upper, lower, value):
     return max(upper, lower) >= value >= min(upper, lower)
+
+def range_len(range: tuple[float, float]) -> float:
+    return abs(range[0]-range[1])
 
 class Rectangle:
     def __init__(self, x_range: tuple[float, float], y_range: tuple[float, float]):
         # assume all lines either vertical or horizontal
+        self.update_ranges(x_range, y_range)
+
+    def update_data(self):
+        # 0 means x axis, 1 means y axis
+        self.longer_axis: bool = 0 if range_len(self.ranges[0]) > range_len(self.ranges[1]) else 1
+        self.shorter_axis: bool = 1 - self.longer_axis
+
+        self.thickness: float = range_len(self.ranges[self.shorter_axis])
+        self.width: float = range_len(self.ranges[self.longer_axis])
+        
+        # places where board is touched on longer axis
+        self.touches: list[float] = []
+
+    def update_ranges(self, x_range: tuple[float, float], y_range: tuple[float, float]):
+        # assume all lines either vertical or horizontal
         self.ranges = (x_range, y_range)
 
-    '''
-    def is_touch(self, rect: Rectangle) -> bool:
+        self.update_data()
+
+    
+    def is_touch(self, rect: Rectangle) -> tuple[bool, float]:
         # TODO: check if overlap on other dimension as well
         # checks if the two rectangles share a side
-        if self.ranges[0][0] == rect.ranges[0][1] \
-            or self.ranges[0][1] == rect.ranges[0][0] \
-            or self.ranges[1][0] == rect.ranges[1][1] \
-            or self.ranges[1][1] == rect.ranges[1][0]:
+        if (self.left_bound() == rect.right_bound() \
+            or self.right_bound() == rect.left_bound()) \
+            and (self.upper_bound() > rect.lower_bound() \
+                 and self.lower_bound() < rect.upper_bound()):
 
-            return True
+            POI = [0,0]
+            POI[0] = self.left_bound() if self.left_bound() == rect.right_bound() else self.right_bound()
+            up = min(self.upper_bound(), rect.upper_bound())
+            down = max(self.lower_bound(), rect.lower_bound())
+            POI[1] = (up + down)/2
 
-        return False'''
+            return True, POI[self.longer_axis]
+
+        if (self.upper_bound() == rect.lower_bound() \
+            or self.lower_bound() == rect.upper_bound()) \
+            and (self.right_bound() > rect.left_bound() \
+                 and self.left_bound() < rect.right_bound()):
+
+            POI = [0,0]
+            POI[1] = self.upper_bound() if self.upper_bound() == rect.lower_bound() else self.lower_bound()
+            right = min(self.right_bound(), rect.right_bound())
+            left = max(self.left_bound(), rect.left_bound())
+            POI[0] = (left + right)/2
+
+            return True, POI[self.longer_axis]
+        return False, -1
+
+    def calculate_buckle_strength(self, E: int = ELASTIC_MODULUS, poisson: float = POISSON):
+        def buckling_formula(k: float, width: float, E: int = E, poisson: float = poisson):
+            return k * (PI**2) * E /(12 * (1-poisson**2)) * ((self.thickness/width)**2)
+        
+        self.touches.sort()
+
+        min_compression_limit = float('inf')
+
+        if len(self.touches) == 0:
+            #manipulation of Euler's formula for stress
+            return (PI**2)*E*(self.thickness**2)/(BRIDGE_LENGTH**2)
+
+        lower_bound = self.lower_bound() if self.longer_axis == 1 else self.left_bound()
+        upper_bound = self.upper_bound() if self.longer_axis == 1 else self.right_bound()
+
+        if self.touches[0] != lower_bound:
+            min_compression_limit = min(min_compression_limit, buckling_formula(0.425, abs(self.touches[0] - lower_bound)))
+
+        if self.touches[-1] != upper_bound:
+            min_compression_limit = min(min_compression_limit, buckling_formula(0.425, abs(self.touches[-1] - upper_bound)))
+
+        for i in range(len(self.touches)-1):
+            if self.touches[i] == self.touches[i+1]:
+                continue
+
+            min_compression_limit = min(min_compression_limit, buckling_formula(4 if self.longer_axis == 0 else 6, abs(self.touches[i] - self.touches[i+1])))
+            # if hotizontal then constant pressure, hence use k = 4
+            # if vertical then linearly varying pressure, hence use k = 6
+            # professor did not give formula for linearly varying pressure on boards with 3 restrained sides, hence neglect those
+
+        return min_compression_limit
 
     def center(self) -> tuple[float, float]:
         return (sum(self.ranges[0])/2, sum(self.ranges[1])/2)
@@ -34,11 +106,17 @@ class Rectangle:
     def upper_bound(self) -> float:
         return max(self.ranges[1])
 
+    def right_bound(self) -> float:
+        return max(self.ranges[0])
+
+    def left_bound(self) -> float:
+        return min(self.ranges[0])
+
     def dimension(self) -> tuple[float, float]:
         return (abs(self.ranges[0][0] - self.ranges[0][1]), abs(self.ranges[1][0] - self.ranges[1][1]))
 
     def at_height(self, y: float) -> bool: 
-        # see if the rectangle intersects at certain height
+        # see if the rectangle exists at certain height
         return within(self.ranges[1][0], self.ranges[1][1], y)
 
 class CrossSection:
@@ -67,6 +145,16 @@ class CrossSection:
 
     def add_glue(self, y:float):
         self.horizontal_glue_joints.append(y)
+
+    def solve_touch(self):
+        for i in self.matboards:
+            i.update_data()
+            for j in self.matboards:
+                if i == j:
+                    continue
+                touched, pos = i.is_touch(j)
+                if touched:
+                    i.touched.append(touched)
 
     def solve(self):
         if len(self.matboards) == 0:
@@ -98,6 +186,8 @@ class CrossSection:
             self.I += dimension[0] * (dimension[1] ** 3) / 12
             self.I += i.area() * ((i.center()[1] - self.y_bar) ** 2)
 
+        # 3. resolve touch
+        self.solve_touch()
 
         self.resolved = True
 

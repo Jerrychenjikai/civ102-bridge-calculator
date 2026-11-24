@@ -1,13 +1,9 @@
 import matplotlib.pyplot as plt
 from beam import *
 from cross_section import *
+from constants import *
 
-TENSION_LIMIT = 30
-COMPRESSION_LIMIT = -6
-ELASTIC_MODULUS = 4000
-GLUE_SHEAR_LIMIT = 2
-
-beam = Beam(1200, ELASTIC_MODULUS)
+beam = Beam(BRIDGE_LENGTH, ELASTIC_MODULUS)
 
 shear_max = Diagram(beam.simulation_list)
 shear_min = Diagram(beam.simulation_list)

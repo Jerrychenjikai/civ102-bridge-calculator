@@ -3,10 +3,6 @@
 def within(upper, lower, value):
     return max(upper, lower) >= value >= min(upper, lower)
 
-class HorizontalGlueJoint:
-    def __init__(self, y: float):
-        self.y: float = y
-
 class Rectangle:
     def __init__(self, x_range: tuple[float, float], y_range: tuple[float, float]):
         # assume all lines either vertical or horizontal
@@ -61,13 +57,16 @@ class CrossSection:
 
     def clear_rect(self):
         self.matboards: list[Rectangle] = []
-        self.horizontal_glue_joints: list[HorizontalGlueJoint] = []
+        self.horizontal_glue_joints: list[float] = []
 
         self.clear()
 
-    def add_rectangle(self, rect: Rectangle):
+    def add_rect(self, rect: Rectangle):
         self.matboards.append(rect)
         self.clear()
+
+    def add_glue(self, y:float):
+        self.horizontal_glue_joints.append(y)
 
     def solve(self):
         if len(self.matboards) == 0:

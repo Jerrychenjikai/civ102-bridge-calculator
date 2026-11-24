@@ -2,14 +2,23 @@ import matplotlib.pyplot as plt
 from beam import *
 from cross_section import *
 
-beam = Beam(1200, 4000)
+TENSION_LIMIT = 30
+COMPRESSION_LIMIT = -6
+ELASTIC_MODULUS = 4000
+GLUE_SHEAR_LIMIT = 2
+
+beam = Beam(1200, ELASTIC_MODULUS)
 
 shear_max = Diagram(beam.simulation_list)
 shear_min = Diagram(beam.simulation_list)
 moment = Diagram(beam.simulation_list)
 phi = Diagram(beam.simulation_list)
+top_tensile = Diagram(beam.simulation_list)
+bottom_tensile = Diagram(beam.simulation_list)
+glue_shears: list[Diagram] = []
 
 train_len = 960
+lightest_train_weight = 0.1 #kN
 
 def generate_load(lightest_freight_weight: float):
     loads = []
@@ -68,9 +77,16 @@ def max_abs_list(a: list[float], b: list[float]):
     return ans
 
 def run_train():
-    global beam, shear_max, shear_min, phi, moment, train_len
+    global beam
+    global shear_max, shear_min, phi, moment, train_len, top_tensile, bottom_tensile
+    global glue_shears
+    global lightest_train_weight
 
-    loads = generate_load(0.1) # lightest train weighs 100N
+    loads = generate_load(lightest_train_weight) # lightest train weighs 100N
+
+    glue_shears = []
+    for i in beam.cross_section.horizontal_glue_joints:
+        glue_shears.append(Diagram(beam.simulation_list))
 
     for i in range(beam.length + train_len + 1):
         beam.clear_force()
@@ -83,11 +99,18 @@ def run_train():
         shear_min.update_y_values(elementwise_min(beam.shear.y_values, shear_min.y_values))
         moment.update_y_values(max_abs_list(beam.moment.y_values, moment.y_values))
         phi.update_y_values(max_abs_list(beam.phi.y_values, phi.y_values))
+        top_tensile.update_y_values(max_abs_list(beam.top_tensile.y_values, top_tensile.y_values))
+        bottom_tensile.update_y_values(max_abs_list(beam.bottom_tensile.y_values, bottom_tensile.y_values))
+
+        for j in range(len(beam.cross_section.horizontal_glue_joints)):
+            glue_shears[j].update_y_values(max_abs_list(beam.glue_shears[j].y_values, glue_shears[j].y_values))
 
         move_loads(1, loads)
 
 def parse_command(command: str):
-    global shear_max, shear_min, moment, phi
+    global shear_max, shear_min, moment, phi, top_tensile, bottom_tensile
+    global glue_shears
+    global lightest_train_weight
     
     tokens = command.strip().split()
     if not tokens:
@@ -100,13 +123,23 @@ def parse_command(command: str):
         print("Command list: ")
         print("  help: show command list")
         print("  add_rect x1 x2 y1 y2: Add rectangle cross section (xmin xmax ymin ymax)")
-        print("  clear_rect: clear all cross sections")
+        print("  clear_rect: clear all cross sections and glue tabs")
         print("  run: run train through and plot graphs")
+        print("  change_weight w: change weight of lightest train")
+        print("  add_glue y: add a glue joint at height y")
+
+    elif cmd == "change_weight":
+        w, = map(float, args)
+        lightest_train_weight = w
+
+    elif cmd == "add_glue":
+        y, = map(float, args)
+        beam.cross_section.add_glue(y)
 
     elif cmd == "add_rect":
         x1, x2, y1, y2 = map(float, args)
         rect = Rectangle((x1, x2), (y1, y2))
-        beam.cross_section.add_rectangle(rect)
+        beam.cross_section.add_rect(rect)
 
     elif cmd == "clear_rect":
         beam.cross_section.clear_rect()
@@ -118,10 +151,13 @@ def parse_command(command: str):
         shear_min = Diagram(beam.simulation_list)
         moment = Diagram(beam.simulation_list)
         phi = Diagram(beam.simulation_list)
+        top_tensile = Diagram(beam.simulation_list)
+        bottom_tensile = Diagram(beam.simulation_list)
 
         run_train()
 
-        fig, axs = plt.subplots(4, 1, figsize=(9, 10), sharex=True)
+        # 窗口 1: 内力与曲率响应图
+        fig1, axs = plt.subplots(4, 1, figsize=(9, 10), sharex=True)
 
         # 1. 正向最大剪力图
         axs[0].plot(shear_max.x_values, shear_max.y_values, label="Max Shear Force (kN)", color="tab:blue")
@@ -148,8 +184,40 @@ def parse_command(command: str):
         axs[3].grid(True)
         axs[3].legend()
 
-        plt.suptitle("Beam Simulation Results")
-        plt.tight_layout()
+        fig1.suptitle("Beam Simulation Results - Internal Forces")
+        fig1.tight_layout()
+
+        # 窗口 2: 材料拉压与 Glue Joint 剪应力对比图
+        fig2, (ax2_1, ax2_2) = plt.subplots(2, 1, figsize=(9, 8), sharex=True)
+
+        # 1. 顶/底拉压应力包络线及极限
+        ax2_1.plot(top_tensile.x_values, top_tensile.y_values, label="Top Tensile Force", color="tab:purple", linewidth=1.5)
+        ax2_1.plot(bottom_tensile.x_values, bottom_tensile.y_values, label="Bottom Tensile Force", color="tab:red", linewidth=1.5)
+
+        ax2_1.axhline(y=TENSION_LIMIT, color='red', linestyle='--', linewidth=1.5, label=f"Tension Limit ({TENSION_LIMIT})")
+        ax2_1.axhline(y=COMPRESSION_LIMIT, color='blue', linestyle='--', linewidth=1.5, label=f"Compression Limit ({COMPRESSION_LIMIT})")
+
+        ax2_1.set_ylabel("Tensile Force / Stress")
+        ax2_1.set_title("Beam Tensile Envelope & Material Limits")
+        ax2_1.grid(True)
+        ax2_1.legend(loc="upper right")
+
+        # 2. 各 Glue Tab 剪应力曲线及极限
+        for idx, glue_diagram in enumerate(glue_shears):
+            y_height = beam.cross_section.horizontal_glue_joints[idx]
+            ax2_2.plot(glue_diagram.x_values, glue_diagram.y_values, label=f"Glue Joint at y={y_height} mm")
+
+        ax2_2.axhline(y=GLUE_SHEAR_LIMIT, color='darkred', linestyle='--', linewidth=1.5, label=f"Glue Shear Limit ({GLUE_SHEAR_LIMIT} MPa)")
+
+        ax2_2.set_xlabel("Position x (mm)")
+        ax2_2.set_ylabel("Glue Shear Stress (MPa)")
+        ax2_2.set_title("Glue Joint Shear Stress Envelope")
+        ax2_2.grid(True)
+        ax2_2.legend(loc="upper right")
+
+        fig2.tight_layout()
+
+        # 同时显示两个窗口
         plt.show()
 
     else:

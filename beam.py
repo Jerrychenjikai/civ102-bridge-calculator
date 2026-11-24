@@ -1,4 +1,5 @@
 from cross_section import *
+import warnings
 
 # all lengths in mm
 # E in mPa
@@ -50,7 +51,8 @@ class Beam:
 
     def add_force(self, force: Force):
         if not within(0, self.length, force.pos):
-            raise ValueError("Force outside the range of beam")
+            warnings.warn("Force outside the range of beam")
+            return
         
         self.forces.append(force)
 
@@ -58,6 +60,11 @@ class Beam:
 
     def remove_force(self, force: Force):
         self.forces.remove(force)
+
+        self.clear()
+
+    def clear_force(self):
+        self.forces = []
 
         self.clear()
 

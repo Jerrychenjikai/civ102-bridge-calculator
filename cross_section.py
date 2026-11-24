@@ -3,11 +3,9 @@
 def within(upper, lower, value):
     return max(upper, lower) >= value >= min(upper, lower)
 
-class LineSegment:
-    def __init__(self, axis: bool, value: float):
-        # assume either vertical or horizontal
-        self.axis: bool = axis # 0 for vertical line, i.e. value is for x axis, 1 for horizontal line, i.e. y axis
-        self.value: float = value
+class HorizontalGlueJoint:
+    def __init__(self, y: float):
+        self.y: float = y
 
 class Rectangle:
     def __init__(self, x_range: tuple[float, float], y_range: tuple[float, float]):
@@ -49,12 +47,12 @@ class Rectangle:
 
 class CrossSection:
     def __init__(self):
-        self.matboards: list[Rectangle] = []
+        self.clear_rect()
 
         self.clear()
 
     def clear(self):
-        self.resolved = False
+        self.resolved: bool = False
 
         self.I: float = -1
         self.y_bar: float = -1
@@ -62,6 +60,11 @@ class CrossSection:
         self.upper_y: float = -1
         self.total_area: float = -1
 
+    def clear_rect(self):
+        self.matboads: list[Rectangle] = []
+        self.horizontal_glue_joints: list[HorizontalGlueJoint] = []
+
+        self.clear()
 
     def add_rectangle(self, rect: Rectangle):
         self.matboards.append(rect)

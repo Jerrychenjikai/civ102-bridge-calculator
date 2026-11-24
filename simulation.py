@@ -3,7 +3,9 @@ from beam import *
 from cross_section import *
 
 beam = Beam(1200, 4000)
-shear = Diagram(beam.simulation_list)
+
+shear_max = Diagram(beam.simulation_list)
+shear_min = Diagram(beam.simulation_list)
 moment = Diagram(beam.simulation_list)
 phi = Diagram(beam.simulation_list)
 
@@ -15,8 +17,7 @@ def generate_load(lightest_freight_weight: float):
                        lightest_freight_weight,
                        lightest_freight_weight * 1.1]
 
-    #assume locomotive at start, lightest in middle, heavier at end
-
+    # assume locomotive at start, lightest in middle, heavier at end
     length = 0
 
     for weight in freight_weights:
@@ -32,9 +33,25 @@ def move_loads(pos: float, loads: list[Force]):
     for i in loads:
         i.pos += pos
 
+def elementwise_max(a: list[float], b: list[float]):
+    if len(a) == 0:
+        return b[:]
+    if len(b) == 0:
+        return a[:]
+    if len(a) != len(b):
+        raise ValueError("lists have to be same length")
+    return [max(x, y) for x, y in zip(a, b)]
 
-def max_list(a: list[float], b: list[float]):
-    # since load applied on the same direction, elements in a and b don't easily change signs
+def elementwise_min(a: list[float], b: list[float]):
+    if len(a) == 0:
+        return b[:]
+    if len(b) == 0:
+        return a[:]
+    if len(a) != len(b):
+        raise ValueError("lists have to be same length")
+    return [min(x, y) for x, y in zip(a, b)]
+
+def max_abs_list(a: list[float], b: list[float]):
     if len(a) == 0:
         return b[:]
     if len(b) == 0:
@@ -43,40 +60,34 @@ def max_list(a: list[float], b: list[float]):
         raise ValueError("lists have to be same length")
 
     ans = []
-
     for i in range(len(a)):
         if abs(a[i]) > abs(b[i]):
             ans.append(a[i])
         else:
             ans.append(b[i])
-
     return ans
 
 def run_train():
-    global beam, shear, phi, moment, train_len
+    global beam, shear_max, shear_min, phi, moment, train_len
 
     loads = generate_load(0.1) # lightest train weighs 100N
 
-    #move_loads(100, loads)
-
     for i in range(beam.length + train_len + 1):
-    #for i in range(1):
         beam.clear_force()
         for j in loads:
             beam.add_force(j)
 
         beam.solve()
 
-        shear.update_y_values(max_list(beam.shear.y_values, shear.y_values))
-        moment.update_y_values(max_list(beam.moment.y_values, moment.y_values))
-        phi.update_y_values(max_list(beam.phi.y_values, phi.y_values))
+        shear_max.update_y_values(elementwise_max(beam.shear.y_values, shear_max.y_values))
+        shear_min.update_y_values(elementwise_min(beam.shear.y_values, shear_min.y_values))
+        moment.update_y_values(max_abs_list(beam.moment.y_values, moment.y_values))
+        phi.update_y_values(max_abs_list(beam.phi.y_values, phi.y_values))
 
         move_loads(1, loads)
 
-
-
 def parse_command(command: str):
-    global shear, moment, phi
+    global shear_max, shear_min, moment, phi
     
     tokens = command.strip().split()
     if not tokens:
@@ -101,32 +112,41 @@ def parse_command(command: str):
         beam.cross_section.clear_rect()
 
     elif cmd == "run":
-
         beam.cross_section.solve()
 
-        shear = Diagram(beam.simulation_list)
+        shear_max = Diagram(beam.simulation_list)
+        shear_min = Diagram(beam.simulation_list)
         moment = Diagram(beam.simulation_list)
         phi = Diagram(beam.simulation_list)
 
         run_train()
 
-        fig, axs = plt.subplots(3, 1, figsize=(9, 8), sharex=True)
+        fig, axs = plt.subplots(4, 1, figsize=(9, 10), sharex=True)
 
-        axs[0].plot(shear.x_values, shear.y_values, label="Shear Force (kN)", color="tab:blue")
-        axs[0].set_ylabel("Shear (kN)")
+        # 1. 正向最大剪力图
+        axs[0].plot(shear_max.x_values, shear_max.y_values, label="Max Shear Force (kN)", color="tab:blue")
+        axs[0].set_ylabel("Max Shear (kN)")
         axs[0].grid(True)
         axs[0].legend()
 
-        axs[1].plot(moment.x_values, moment.y_values, label="Bending Moment (Nm)", color="tab:orange")
-        axs[1].set_ylabel("Moment (Nm)")
+        # 2. 负向最小剪力图
+        axs[1].plot(shear_min.x_values, shear_min.y_values, label="Min Shear Force (kN)", color="tab:cyan")
+        axs[1].set_ylabel("Min Shear (kN)")
         axs[1].grid(True)
         axs[1].legend()
 
-        axs[2].plot(phi.x_values, phi.y_values, label="Curvature Phi", color="tab:green")
-        axs[2].set_xlabel("Position x (mm)")
-        axs[2].set_ylabel("Phi")
+        # 3. 弯矩图
+        axs[2].plot(moment.x_values, moment.y_values, label="Bending Moment (Nm)", color="tab:orange")
+        axs[2].set_ylabel("Moment (Nm)")
         axs[2].grid(True)
         axs[2].legend()
+
+        # 4. 曲率图
+        axs[3].plot(phi.x_values, phi.y_values, label="Curvature Phi", color="tab:green")
+        axs[3].set_xlabel("Position x (mm)")
+        axs[3].set_ylabel("Phi")
+        axs[3].grid(True)
+        axs[3].legend()
 
         plt.suptitle("Beam Simulation Results")
         plt.tight_layout()

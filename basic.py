@@ -1,5 +1,8 @@
 # all numbers in mm
 
+def within(upper, lower, value):
+    return max(upper, lower) >= value >= min(upper, lower)
+
 class LineSegment:
     def __init__(self, axis: bool, value: float):
         # assume either vertical or horizontal
@@ -11,6 +14,7 @@ class Rectangle:
         # assume all lines either vertical or horizontal
         self.ranges = (x_range, y_range)
 
+    '''
     def is_touch(self, rect: Rectangle) -> bool:
         # TODO: check if overlap on other dimension as well
         # checks if the two rectangles share a side
@@ -21,7 +25,7 @@ class Rectangle:
 
             return True
 
-        return False
+        return False'''
 
     def center(self) -> tuple[float, float]:
         return (sum(self.ranges[0])/2, sum(self.ranges[1])/2)
@@ -38,6 +42,10 @@ class Rectangle:
 
     def dimension(self) -> tuple[float, float]:
         return (abs(self.ranges[0][0] - self.ranges[0][1]), abs(self.ranges[1][0] - self.ranges[1][1]))
+
+    def at_height(self, y: float) -> bool: 
+        # see if the rectangle intersects at certain height
+        return within(self.ranges[1][0], self.ranges[1][1], y)
 
 class CrossSection:
     def __init__(self):
@@ -91,6 +99,33 @@ class CrossSection:
 
 
         self.resolved = True
+
+    def width_at_height(self, y: float) -> float:
+        ans = 0
+
+        for i in self.matboards:
+            if i.at_height(y):
+                ans += i.dimension()[0]
+
+        return ans
+
+    def Q_at_height(self, y: float) -> float:
+        # assume upper_y is free of shear
+        self.solve()
+
+        ans = 0
+
+        for i in self.matboards:
+            a = i
+            if a.at_height(y):
+                a = Rectangle(a.ranges[0], (max(a.ranges[1][0], y), max(a.ranges[1][1], y)))
+            if a.lower_bound() >= y:
+                ans += a.area() * (a.center()[1] - y)
+
+        return ans
+                
+            
+
 
     
     

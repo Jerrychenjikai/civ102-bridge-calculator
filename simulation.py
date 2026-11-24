@@ -106,12 +106,13 @@ def run_train():
 
     # calculate local buckling stress -> irrelevant to train load
     moment_constraints = []
+    beam.cross_section.solve_touch()
     for i in beam.cross_section.matboards:
         stress_limit = i.calculate_buckle_strength()
         # stress = my/i
         y = (i.center()[1] - beam.cross_section.y_bar)
-        if not eq(y, 0, tol = 0.001):
-            m_limit = - stress_limit * beam.cross_section.I / y * 1000
+        if not eq(y, 0, tol = 1e-6):
+            m_limit = - stress_limit * beam.cross_section.I / y / 1000
             moment_constraints.append(m_limit)
 
 def parse_command(command: str):

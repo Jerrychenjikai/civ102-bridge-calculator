@@ -70,15 +70,15 @@ class Rectangle:
 
         if len(self.touches) == 0:
             #manipulation of Euler's formula for stress
-            return (PI**2)*E*(self.thickness**2)/(BRIDGE_LENGTH**2)
+            return (PI**2)*E*(self.thickness**2)/(BRIDGE_LENGTH**2)/12
 
         lower_bound = self.lower_bound() if self.longer_axis == 1 else self.left_bound()
         upper_bound = self.upper_bound() if self.longer_axis == 1 else self.right_bound()
 
-        if self.touches[0] != lower_bound:
+        if not eq(self.touches[0], lower_bound):
             min_compression_limit = min(min_compression_limit, buckling_formula(0.425, abs(self.touches[0] - lower_bound)))
 
-        if self.touches[-1] != upper_bound:
+        if not eq(self.touches[-1], upper_bound):
             min_compression_limit = min(min_compression_limit, buckling_formula(0.425, abs(self.touches[-1] - upper_bound)))
 
         for i in range(len(self.touches)-1):
@@ -210,7 +210,7 @@ class CrossSection:
             if a.at_height(y):
                 a = Rectangle(a.ranges[0], (max(a.ranges[1][0], y), max(a.ranges[1][1], y)))
             if a.lower_bound() >= y:
-                ans += a.area() * (a.center()[1] - y)
+                ans += a.area() * (a.center()[1] - self.y_bar)
 
         return ans
                 

@@ -6,3 +6,8 @@ GLUE_SHEAR_LIMIT = 2
 BRIDGE_LENGTH = 1200
 PI = 3.14159265358979
 EQ_TOL = 1e-8
+
+def eq(a: float, b: float, tol: float = EQ_TOL):
+    if abs(a - b) < tol:
+        return True
+    return False

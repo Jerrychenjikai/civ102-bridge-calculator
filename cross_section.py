@@ -8,11 +8,6 @@ def within(upper, lower, value):
 def range_len(range: tuple[float, float]) -> float:
     return abs(range[0]-range[1])
 
-def eq(a: float, b: float, tol: float = EQ_TOL):
-    if abs(a - b) < tol:
-        return True
-    return False
-
 class Rectangle:
     def __init__(self, x_range: tuple[float, float], y_range: tuple[float, float]):
         # assume all lines either vertical or horizontal
@@ -148,6 +143,8 @@ class CrossSection:
         self.clear()
 
     def add_glue(self, y:float):
+        if self.width_at_height(y) == 0:
+            raise ValueError("does not have any surface to glue on")
         self.horizontal_glue_joints.append(y)
 
     def solve_touch(self):
@@ -158,7 +155,7 @@ class CrossSection:
                     continue
                 touched, pos = i.is_touch(j)
                 if touched:
-                    i.touches.append(touched)
+                    i.touches.append(pos)
 
     def solve(self):
         if len(self.matboards) == 0:
@@ -189,9 +186,6 @@ class CrossSection:
             dimension = i.dimension()
             self.I += dimension[0] * (dimension[1] ** 3) / 12
             self.I += i.area() * ((i.center()[1] - self.y_bar) ** 2)
-
-        # 3. resolve touch
-        self.solve_touch()
 
         self.resolved = True
 

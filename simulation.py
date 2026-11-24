@@ -12,6 +12,7 @@ phi = Diagram(beam.simulation_list)
 top_tensile = Diagram(beam.simulation_list)
 bottom_tensile = Diagram(beam.simulation_list)
 glue_shears: list[Diagram] = []
+moment_constraints: list[float] = [] #moment constraints from local buckling of boards
 
 train_len = 960
 lightest_train_weight = 0.1 #kN
@@ -75,7 +76,7 @@ def max_abs_list(a: list[float], b: list[float]):
 def run_train():
     global beam
     global shear_max, shear_min, phi, moment, train_len, top_tensile, bottom_tensile
-    global glue_shears
+    global glue_shears, moment_constraints
     global lightest_train_weight
 
     loads = generate_load(lightest_train_weight) # lightest train weighs 100N
@@ -103,9 +104,19 @@ def run_train():
 
         move_loads(1, loads)
 
+    # calculate local buckling stress -> irrelevant to train load
+    moment_constraints = []
+    for i in beam.cross_section.matboards:
+        stress_limit = i.calculate_buckle_strength()
+        # stress = my/i
+        y = (i.center()[1] - beam.cross_section.y_bar)
+        if not eq(y, 0, tol = 0.001):
+            m_limit = - stress_limit * beam.cross_section.I / y * 1000
+            moment_constraints.append(m_limit)
+
 def parse_command(command: str):
     global shear_max, shear_min, moment, phi, top_tensile, bottom_tensile
-    global glue_shears
+    global glue_shears, moment_constraints
     global lightest_train_weight
     
     tokens = command.strip().split()
@@ -169,6 +180,8 @@ def parse_command(command: str):
 
         # 3. 弯矩图
         axs[2].plot(moment.x_values, moment.y_values, label="Bending Moment (Nm)", color="tab:orange")
+        for i in moment_constraints:
+            axs[2].axhline(y=i, color='red', linestyle='--', linewidth=1.5, label="moment limit from local buckling")
         axs[2].set_ylabel("Moment (Nm)")
         axs[2].grid(True)
         axs[2].legend()

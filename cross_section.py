@@ -8,6 +8,11 @@ def within(upper, lower, value):
 def range_len(range: tuple[float, float]) -> float:
     return abs(range[0]-range[1])
 
+def eq(a: float, b: float, tol: float = EQ_TOL):
+    if abs(a - b) < tol:
+        return True
+    return False
+
 class Rectangle:
     def __init__(self, x_range: tuple[float, float], y_range: tuple[float, float]):
         # assume all lines either vertical or horizontal
@@ -32,28 +37,27 @@ class Rectangle:
 
     
     def is_touch(self, rect: Rectangle) -> tuple[bool, float]:
-        # TODO: check if overlap on other dimension as well
         # checks if the two rectangles share a side
-        if (self.left_bound() == rect.right_bound() \
-            or self.right_bound() == rect.left_bound()) \
+        if (eq(self.left_bound(), rect.right_bound()) \
+            or eq(self.right_bound(), rect.left_bound())) \
             and (self.upper_bound() > rect.lower_bound() \
                  and self.lower_bound() < rect.upper_bound()):
 
             POI = [0,0]
-            POI[0] = self.left_bound() if self.left_bound() == rect.right_bound() else self.right_bound()
+            POI[0] = self.left_bound() if eq(self.left_bound(), rect.right_bound()) else self.right_bound()
             up = min(self.upper_bound(), rect.upper_bound())
             down = max(self.lower_bound(), rect.lower_bound())
             POI[1] = (up + down)/2
 
             return True, POI[self.longer_axis]
 
-        if (self.upper_bound() == rect.lower_bound() \
-            or self.lower_bound() == rect.upper_bound()) \
+        if (eq(self.upper_bound(), rect.lower_bound()) \
+            or eq(self.lower_bound(), rect.upper_bound())) \
             and (self.right_bound() > rect.left_bound() \
                  and self.left_bound() < rect.right_bound()):
 
             POI = [0,0]
-            POI[1] = self.upper_bound() if self.upper_bound() == rect.lower_bound() else self.lower_bound()
+            POI[1] = self.upper_bound() if eq(self.upper_bound(), rect.lower_bound()) else self.lower_bound()
             right = min(self.right_bound(), rect.right_bound())
             left = max(self.left_bound(), rect.left_bound())
             POI[0] = (left + right)/2
@@ -83,7 +87,7 @@ class Rectangle:
             min_compression_limit = min(min_compression_limit, buckling_formula(0.425, abs(self.touches[-1] - upper_bound)))
 
         for i in range(len(self.touches)-1):
-            if self.touches[i] == self.touches[i+1]:
+            if eq(self.touches[i], self.touches[i+1]):
                 continue
 
             min_compression_limit = min(min_compression_limit, buckling_formula(4 if self.longer_axis == 0 else 6, abs(self.touches[i] - self.touches[i+1])))
@@ -154,7 +158,7 @@ class CrossSection:
                     continue
                 touched, pos = i.is_touch(j)
                 if touched:
-                    i.touched.append(touched)
+                    i.touches.append(touched)
 
     def solve(self):
         if len(self.matboards) == 0:
@@ -202,7 +206,8 @@ class CrossSection:
 
     def Q_at_height(self, y: float) -> float:
         # assume upper_y is free of shear
-        self.solve()
+        if not self.resolved:
+            self.solve()
 
         ans = 0
 

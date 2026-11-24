@@ -123,12 +123,12 @@ class Beam:
         self.phi.update_y_values(y_values)
 
         # 4. draw top tensile diagram
-        y_values = [m * (self.cross_section.upper_y - self.cross_section.y_bar) / self.cross_section.I for m in self.moment.y_values]
+        y_values = [m * (self.cross_section.upper_y - self.cross_section.y_bar) / self.cross_section.I * 1000 for m in self.moment.y_values]
 
         self.top_tensile.update_y_values(y_values)
 
         # 5. draw bottom tensile diagram
-        y_values = [m * (self.cross_section.lower_y - self.cross_section.y_bar) / self.cross_section.I for m in self.moment.y_values]
+        y_values = [m * (self.cross_section.lower_y - self.cross_section.y_bar) / self.cross_section.I * 1000 for m in self.moment.y_values]
         
         self.bottom_tensile.update_y_values(y_values)
 

@@ -45,7 +45,7 @@ class Beam:
         self.phi: Diagram = Diagram(self.simulation_list)
 
         self.reaction_force_left: Force = Force(0, 0)
-        self.reaction_force_right: Force = Force(self.length, 0)
+        self.reaction_force_right: Force = Force(0, self.length)
         
         self.solved = False
 

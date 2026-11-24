@@ -21,9 +21,9 @@ def generate_load(lightest_freight_weight: float):
 
     for weight in freight_weights:
         length += 52
-        loads.append(Force(weight/2, -length))
+        loads.append(Force(-weight/2, -length))
         length += 176
-        loads.append(Force(weight/2, -length))
+        loads.append(Force(-weight/2, -length))
         length += 164
 
     return loads
@@ -57,7 +57,10 @@ def run_train():
 
     loads = generate_load(0.1) # lightest train weighs 100N
 
+    #move_loads(100, loads)
+
     for i in range(beam.length + train_len + 1):
+    #for i in range(1):
         beam.clear_force()
         for j in loads:
             beam.add_force(j)

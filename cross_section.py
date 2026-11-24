@@ -48,7 +48,6 @@ class Rectangle:
 class CrossSection:
     def __init__(self):
         self.clear_rect()
-
         self.clear()
 
     def clear(self):
@@ -61,7 +60,7 @@ class CrossSection:
         self.total_area: float = -1
 
     def clear_rect(self):
-        self.matboads: list[Rectangle] = []
+        self.matboards: list[Rectangle] = []
         self.horizontal_glue_joints: list[HorizontalGlueJoint] = []
 
         self.clear()

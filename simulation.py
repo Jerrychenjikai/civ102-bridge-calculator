@@ -182,7 +182,7 @@ def parse_command(command: str):
         # 3. 弯矩图
         axs[2].plot(moment.x_values, moment.y_values, label="Bending Moment (Nm)", color="tab:orange")
         for i in moment_constraints:
-            axs[2].axhline(y=i, color='red', linestyle='--', linewidth=1.5, label="moment limit from local buckling")
+            axs[2].axhline(y=i, color='red', linestyle='--', linewidth=1.5, label=f"moment limit from local buckling {i}Nm")
         axs[2].set_ylabel("Moment (Nm)")
         axs[2].grid(True)
         axs[2].legend()

@@ -92,12 +92,12 @@ class Beam:
         forces = self.forces + [self.reaction_force_left, self.reaction_force_right]
 
         # 1. draw shear force diagram
-        shear_summ = 0
         y_values = []
 
         for i in self.simulation_list:
+            shear_summ = 0
             for j in forces:
-                if i-1 < j.pos <= i:
+                if j.pos <= i:
                     shear_summ += j.mag
 
             y_values.append(shear_summ)

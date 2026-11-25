@@ -45,6 +45,7 @@ class Beam:
         self.phi: Diagram = Diagram(self.simulation_list)
         self.top_tensile: Diagram = Diagram(self.simulation_list)
         self.bottom_tensile: Diagram = Diagram(self.simulation_list)
+        self.y_bar_shear: Diagram = Diagram(self.simulation_list)
 
         self.glue_shears: list[Diagram] = []
         for i in self.cross_section.horizontal_glue_joints:
@@ -141,6 +142,16 @@ class Beam:
             y_values = [V * Q / I /width * 1000 for V in self.shear.y_values] # multiply by 1000 to align with unit convention
 
             self.glue_shears[i].update_y_values(y_values)
+
+        # 7. calculate shear at y_bar
+        y = self.cross_section.y_bar
+        Q = self.cross_section.Q_at_height(y)
+        I = self.cross_section.I
+        width = self.cross_section.glue_width_at_height(y)
+        y_values = [V * Q / I /width * 1000 for V in self.shear.y_values]
+
+        self.y_bar_shear.update_y_values(y_values)
+
 
     
     

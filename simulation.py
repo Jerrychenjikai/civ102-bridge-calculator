@@ -12,10 +12,11 @@ phi = Diagram(beam.simulation_list)
 top_tensile = Diagram(beam.simulation_list)
 bottom_tensile = Diagram(beam.simulation_list)
 glue_shears: list[Diagram] = []
-moment_constraints: list[float] = [] #moment constraints from local buckling of boards
+y_bar_shear: Diagram = Diagram(beam.simulation_list)
+moment_constraints: list[float] = [] # moment constraints from local buckling of boards
 
 train_len = 960
-lightest_train_weight = 0.1 #kN
+lightest_train_weight = 0.1 # kN
 
 def generate_load(lightest_freight_weight: float):
     loads = []
@@ -76,7 +77,7 @@ def max_abs_list(a: list[float], b: list[float]):
 def run_train():
     global beam
     global shear_max, shear_min, phi, moment, train_len, top_tensile, bottom_tensile
-    global glue_shears, moment_constraints
+    global glue_shears, y_bar_shear, moment_constraints
     global lightest_train_weight
 
     loads = generate_load(lightest_train_weight) # lightest train weighs 100N
@@ -98,6 +99,7 @@ def run_train():
         phi.update_y_values(max_abs_list(beam.phi.y_values, phi.y_values))
         top_tensile.update_y_values(max_abs_list(beam.top_tensile.y_values, top_tensile.y_values))
         bottom_tensile.update_y_values(max_abs_list(beam.bottom_tensile.y_values, bottom_tensile.y_values))
+        y_bar_shear.update_y_values(max_abs_list(beam.y_bar_shear.y_values, y_bar_shear.y_values))
 
         for j in range(len(beam.cross_section.horizontal_glue_joints)):
             glue_shears[j].update_y_values(max_abs_list(beam.glue_shears[j].y_values, glue_shears[j].y_values))
@@ -117,7 +119,7 @@ def run_train():
 
 def parse_command(command: str):
     global shear_max, shear_min, moment, phi, top_tensile, bottom_tensile
-    global glue_shears, moment_constraints
+    global glue_shears, y_bar_shear, moment_constraints
     global lightest_train_weight
     
     tokens = command.strip().split()
@@ -161,6 +163,7 @@ def parse_command(command: str):
         phi = Diagram(beam.simulation_list)
         top_tensile = Diagram(beam.simulation_list)
         bottom_tensile = Diagram(beam.simulation_list)
+        y_bar_shear = Diagram(beam.simulation_list)
 
         run_train()
 
@@ -182,7 +185,8 @@ def parse_command(command: str):
         # 3. 弯矩图
         axs[2].plot(moment.x_values, moment.y_values, label="Bending Moment (Nm)", color="tab:orange")
         for i in moment_constraints:
-            axs[2].axhline(y=i, color='red', linestyle='--', linewidth=1.5, label=f"moment limit from local buckling {i}Nm")
+            if i <= 0:
+                axs[2].axhline(y=i, color='red', linestyle='--', linewidth=1.5, label=f"moment limit from local buckling {i:.2f}Nm")
         axs[2].set_ylabel("Moment (Nm)")
         axs[2].grid(True)
         axs[2].legend()
@@ -197,15 +201,15 @@ def parse_command(command: str):
         fig1.suptitle("Beam Simulation Results - Internal Forces")
         fig1.tight_layout()
 
-        # 窗口 2: 材料拉压与 Glue Joint 剪应力对比图
-        fig2, (ax2_1, ax2_2) = plt.subplots(2, 1, figsize=(9, 8), sharex=True)
+        # 窗口 2: 材料拉压、Glue Joint 剪应力及 Matboard 中性轴剪应力对比图
+        fig2, (ax2_1, ax2_2, ax2_3) = plt.subplots(3, 1, figsize=(9, 11), sharex=True)
 
         # 1. 顶/底拉压应力包络线及极限
         ax2_1.plot(top_tensile.x_values, top_tensile.y_values, label="Top Tensile Force", color="tab:purple", linewidth=1.5)
         ax2_1.plot(bottom_tensile.x_values, bottom_tensile.y_values, label="Bottom Tensile Force", color="tab:red", linewidth=1.5)
 
-        ax2_1.axhline(y=TENSION_LIMIT, color='red', linestyle='--', linewidth=1.5, label=f"Tension Limit ({TENSION_LIMIT})")
-        ax2_1.axhline(y=COMPRESSION_LIMIT, color='blue', linestyle='--', linewidth=1.5, label=f"Compression Limit ({COMPRESSION_LIMIT})")
+        ax2_1.axhline(y=TENSION_LIMIT, color='red', linestyle='--', linewidth=1.5, label=f"Tension Limit ({TENSION_LIMIT} MPa)")
+        ax2_1.axhline(y=COMPRESSION_LIMIT, color='blue', linestyle='--', linewidth=1.5, label=f"Compression Limit ({COMPRESSION_LIMIT} MPa)")
 
         ax2_1.set_ylabel("Tensile Force / Stress")
         ax2_1.set_title("Beam Tensile Envelope & Material Limits")
@@ -218,12 +222,23 @@ def parse_command(command: str):
             ax2_2.plot(glue_diagram.x_values, glue_diagram.y_values, label=f"Glue Joint at y={y_height} mm")
 
         ax2_2.axhline(y=GLUE_SHEAR_LIMIT, color='darkred', linestyle='--', linewidth=1.5, label=f"Glue Shear Limit ({GLUE_SHEAR_LIMIT} MPa)")
+        ax2_2.axhline(y=-GLUE_SHEAR_LIMIT, color='darkred', linestyle='--', linewidth=1.5)
 
-        ax2_2.set_xlabel("Position x (mm)")
         ax2_2.set_ylabel("Glue Shear Stress (MPa)")
         ax2_2.set_title("Glue Joint Shear Stress Envelope")
         ax2_2.grid(True)
         ax2_2.legend(loc="upper right")
+
+        # 3. 中性轴处 Matboard 剪应力包络线及极限
+        ax2_3.plot(y_bar_shear.x_values, y_bar_shear.y_values, label="Matboard Shear at y_bar", color="tab:olive", linewidth=1.5)
+        ax2_3.axhline(y=MATBOARD_SHEAR_LIMIT, color='brown', linestyle='--', linewidth=1.5, label=f"Matboard Shear Limit ({MATBOARD_SHEAR_LIMIT} MPa)")
+        ax2_3.axhline(y=-MATBOARD_SHEAR_LIMIT, color='brown', linestyle='--', linewidth=1.5)
+
+        ax2_3.set_xlabel("Position x (mm)")
+        ax2_3.set_ylabel("Matboard Shear Stress (MPa)")
+        ax2_3.set_title("Matboard Neutral Axis Shear Stress Envelope")
+        ax2_3.grid(True)
+        ax2_3.legend(loc="upper right")
 
         fig2.tight_layout()
 

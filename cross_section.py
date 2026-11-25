@@ -147,7 +147,7 @@ class CrossSection:
         self.clear()
 
     def add_glue(self, y:float):
-        if self.glue_width_at_height(y) == 0:
+        if eq(self.glue_width_at_height(y), 0):
             raise ValueError("does not have any surface to glue on")
         self.horizontal_glue_joints.append(y)
 

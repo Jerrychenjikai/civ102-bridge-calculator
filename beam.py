@@ -135,7 +135,7 @@ class Beam:
         # 6. draw shear tension at glue joints:
         for i in range(len(self.cross_section.horizontal_glue_joints)):
             y = self.cross_section.horizontal_glue_joints[i]
-            width = self.cross_section.width_at_height(y)
+            width = self.cross_section.glue_width_at_height(y)
             Q = self.cross_section.Q_at_height(y)
             I = self.cross_section.I
             y_values = [V * Q / I /width * 1000 for V in self.shear.y_values] # multiply by 1000 to align with unit convention

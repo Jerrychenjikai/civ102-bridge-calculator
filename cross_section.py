@@ -1,4 +1,5 @@
 # all numbers in mm
+# assume: no overlap between Rectangles
 
 from constants import *
 
@@ -31,7 +32,7 @@ class Rectangle:
         self.update_data()
 
     
-    def is_touch(self, rect: Rectangle) -> tuple[bool, float]:
+    def is_touch(self, rect: Rectangle) -> tuple[bool, float, float]: # touched, pos of touch, length of touch
         # checks if the two rectangles share a side
         if (eq(self.left_bound(), rect.right_bound()) \
             or eq(self.right_bound(), rect.left_bound())) \
@@ -44,7 +45,7 @@ class Rectangle:
             down = max(self.lower_bound(), rect.lower_bound())
             POI[1] = (up + down)/2
 
-            return True, POI[self.longer_axis]
+            return True, POI[self.longer_axis], (up - down)
 
         if (eq(self.upper_bound(), rect.lower_bound()) \
             or eq(self.lower_bound(), rect.upper_bound())) \
@@ -57,8 +58,8 @@ class Rectangle:
             left = max(self.left_bound(), rect.left_bound())
             POI[0] = (left + right)/2
 
-            return True, POI[self.longer_axis]
-        return False, -1
+            return True, POI[self.longer_axis], (right - left)
+        return False, -1, 0
 
     def calculate_buckle_strength(self, E: int = ELASTIC_MODULUS, poisson: float = POISSON):
         def buckling_formula(k: float, width: float, E: int = E, poisson: float = poisson):
@@ -118,6 +119,9 @@ class Rectangle:
         # see if the rectangle exists at certain height
         return within(self.ranges[1][0], self.ranges[1][1], y)
 
+    def cross_height(self, y: float) -> bool:
+        return self.at_height(y) and not eq(self.ranges[1][0], y) and not eq(self.ranges[1][1], y)
+
 class CrossSection:
     def __init__(self):
         self.clear_rect()
@@ -143,7 +147,7 @@ class CrossSection:
         self.clear()
 
     def add_glue(self, y:float):
-        if self.width_at_height(y) == 0:
+        if self.glue_width_at_height(y) == 0:
             raise ValueError("does not have any surface to glue on")
         self.horizontal_glue_joints.append(y)
 
@@ -153,7 +157,7 @@ class CrossSection:
             for j in self.matboards:
                 if i == j:
                     continue
-                touched, pos = i.is_touch(j)
+                touched, pos, _ = i.is_touch(j)
                 if touched:
                     i.touches.append(pos)
 
@@ -189,12 +193,25 @@ class CrossSection:
 
         self.resolved = True
 
-    def width_at_height(self, y: float) -> float:
+    def glue_width_at_height(self, y: float) -> float:
         ans = 0
 
+        up: list[Rectangle] = []
+        down: list[Rectangle] = []
+
         for i in self.matboards:
-            if i.at_height(y):
+            if i.cross_height(y):
                 ans += i.dimension()[0]
+            elif i.at_height(y):
+                if i.center()[1] > y:
+                    up.append(i)
+                else:
+                    down.append(i)
+
+        for i in up:
+            for j in down:
+                _, _, length = i.is_touch(j)
+                ans += length
 
         return ans
 

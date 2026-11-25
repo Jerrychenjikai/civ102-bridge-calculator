@@ -32,7 +32,7 @@ def generate_load(lightest_freight_weight: float):
         loads.append(Force(-weight/2, -length))
         length += 176
         loads.append(Force(-weight/2, -length))
-        length += 164
+        length += 112 # initially 164, now 164 - 52 = 112
 
     return loads
 

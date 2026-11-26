@@ -93,7 +93,7 @@ class Rectangle:
             # if hotizontal then constant pressure, hence use k = 4
             # if vertical then linearly varying pressure, hence use k = 6
             # professor did not give formula for linearly varying pressure on boards with 3 restrained sides, hence neglect those. (what about T beams?)
-            # for vertical matboards, only account for the part under compression i.e. above y_bar, hence the max y_bar stuff
+            # for vertical matboards, only account for the part under compression i.e. above y_bar, hence the max y_bar stuff, so that k = 6 holds
 
         return min_compression_limit
 

@@ -26,6 +26,16 @@ class Diagram:
             raise ValueError("len of y and x must match")
         
         self.y_values = y
+
+    def get_max_point(self) -> tuple[float, float]:
+        idx = self.y_values.index(max(self.y_values))
+
+        return (self.x_values[idx], self.y_values[idx])
+
+    def get_min_point(self) -> tuple[float, float]:
+        idx = self.y_values.index(min(self.y_values))
+
+        return (self.x_values[idx], self.y_values[idx])
     
 
 class Beam:

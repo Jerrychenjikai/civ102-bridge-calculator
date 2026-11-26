@@ -118,6 +118,21 @@ def run_train():
             m_limit = - stress_limit * beam.cross_section.I / y / 1000
             moment_constraints.append(m_limit)
 
+def annotate_point(ax, point: tuple[float, float], label: str, is_max: bool, dashed_limit: float = None):
+    """辅助标注函数：标出点位坐标，若提供虚线极限则显示 Factor of Safety"""
+    x, y = point
+    color = 'red' if is_max else 'green'
+    text = f"{label}: ({x:.1f}, {y:.2f})"
+    if dashed_limit is not None and y != 0:
+        fos = abs(dashed_limit / y)
+        text += f"\nFOS: {fos:.2f}"
+    
+    ax.plot(x, y, marker='o', color=color, markersize=5, zorder=5)
+    xytext = (0, 10) if is_max else (0, -20)
+    ax.annotate(text, (x, y), xytext=xytext, textcoords="offset points",
+                ha='center', fontsize=8,
+                bbox=dict(boxstyle="round,pad=0.2", fc="yellow", alpha=0.6))
+
 def parse_command(command: str):
     global shear_max, shear_min, moment, phi, top_tensile, bottom_tensile
     global glue_shears, y_bar_shear, moment_constraints
@@ -171,29 +186,36 @@ def parse_command(command: str):
         # 窗口 1: 内力与曲率响应图
         fig1, axs = plt.subplots(4, 1, figsize=(9, 10), sharex=True)
 
-        # 1. 正向最大剪力图
+        # 1. 正向最大剪力图 (标注最大值)
         axs[0].plot(shear_max.x_values, shear_max.y_values, label="Max Shear Force (kN)", color="tab:blue")
+        annotate_point(axs[0], shear_max.get_max_point(), "Max Shear", is_max=True)
         axs[0].set_ylabel("Max Shear (kN)")
         axs[0].grid(True)
         axs[0].legend()
 
-        # 2. 负向最小剪力图
+        # 2. 负向最小剪力图 (标注最小值)
         axs[1].plot(shear_min.x_values, shear_min.y_values, label="Min Shear Force (kN)", color="tab:cyan")
+        annotate_point(axs[1], shear_min.get_min_point(), "Min Shear", is_max=False)
         axs[1].set_ylabel("Min Shear (kN)")
         axs[1].grid(True)
         axs[1].legend()
 
-        # 3. 弯矩图
+        # 3. 弯矩图 (先过滤正值 constraint，再取绝对值最小的绘制与计算 FOS)
         axs[2].plot(moment.x_values, moment.y_values, label="Bending Moment (Nm)", color="tab:orange")
-        for i in moment_constraints:
-            if i <= 0:
-                axs[2].axhline(y=i, color='red', linestyle='--', linewidth=1.5, label=f"moment limit from local buckling {i:.2f}Nm")
+        valid_moment_limits = [i for i in moment_constraints if i <= 0]
+        min_moment_limit = min(valid_moment_limits, key=abs) if valid_moment_limits else None
+        
+        for i in valid_moment_limits:
+            axs[2].axhline(y=i, color='red', linestyle='--', linewidth=1.5, label=f"moment limit from local buckling {i:.2f}Nm")
+        
+        annotate_point(axs[2], moment.get_min_point(), "Min Moment", is_max=False, dashed_limit=min_moment_limit)
         axs[2].set_ylabel("Moment (Nm)")
         axs[2].grid(True)
         axs[2].legend()
 
-        # 4. 曲率图
+        # 4. 曲率图 (标注最小值)
         axs[3].plot(phi.x_values, phi.y_values, label="Curvature Phi", color="tab:green")
+        annotate_point(axs[3], phi.get_min_point(), "Min Phi", is_max=False)
         axs[3].set_xlabel("Position x (mm)")
         axs[3].set_ylabel("Phi")
         axs[3].grid(True)
@@ -205,35 +227,45 @@ def parse_command(command: str):
         # 窗口 2: 材料拉压、Glue Joint 剪应力及 Matboard 中性轴剪应力对比图
         fig2, (ax2_1, ax2_2, ax2_3) = plt.subplots(3, 1, figsize=(9, 11), sharex=True)
 
-        # 1. 顶/底拉压应力包络线及极限
+        # 1. 顶/底拉压应力包络线及极限 (标注 Tensile Max, Compressive Min 及 FOS)
         ax2_1.plot(top_tensile.x_values, top_tensile.y_values, label="Top Tensile Force", color="tab:purple", linewidth=1.5)
         ax2_1.plot(bottom_tensile.x_values, bottom_tensile.y_values, label="Bottom Tensile Force", color="tab:red", linewidth=1.5)
 
         ax2_1.axhline(y=TENSION_LIMIT, color='red', linestyle='--', linewidth=1.5, label=f"Tension Limit ({TENSION_LIMIT} MPa)")
         ax2_1.axhline(y=COMPRESSION_LIMIT, color='blue', linestyle='--', linewidth=1.5, label=f"Compression Limit ({COMPRESSION_LIMIT} MPa)")
 
+        # Top 曲线极值点
+        annotate_point(ax2_1, top_tensile.get_min_point(), "Top Comp Min", is_max=False, dashed_limit=COMPRESSION_LIMIT)
+        # Bottom 曲线极值点
+        annotate_point(ax2_1, bottom_tensile.get_max_point(), "Bottom Tensile Max", is_max=True, dashed_limit=TENSION_LIMIT)
+
         ax2_1.set_ylabel("Tensile Force / Stress")
         ax2_1.set_title("Beam Tensile Envelope & Material Limits")
         ax2_1.grid(True)
         ax2_1.legend(loc="upper right")
 
-        # 2. 各 Glue Tab 剪应力曲线及极限
+        # 2. 各 Glue Tab 剪应力曲线及极限 (标注 Max, Min 及 FOS)
+        ax2_2.axhline(y=GLUE_SHEAR_LIMIT, color='darkred', linestyle='--', linewidth=1.5, label=f"Glue Shear Limit ({GLUE_SHEAR_LIMIT} MPa)")
+        ax2_2.axhline(y=-GLUE_SHEAR_LIMIT, color='darkred', linestyle='--', linewidth=1.5)
+
         for idx, glue_diagram in enumerate(glue_shears):
             y_height = beam.cross_section.horizontal_glue_joints[idx]
             ax2_2.plot(glue_diagram.x_values, glue_diagram.y_values, label=f"Glue Joint at y={y_height} mm")
-
-        ax2_2.axhline(y=GLUE_SHEAR_LIMIT, color='darkred', linestyle='--', linewidth=1.5, label=f"Glue Shear Limit ({GLUE_SHEAR_LIMIT} MPa)")
-        ax2_2.axhline(y=-GLUE_SHEAR_LIMIT, color='darkred', linestyle='--', linewidth=1.5)
+            annotate_point(ax2_2, glue_diagram.get_max_point(), f"Glue y={y_height} Max", is_max=True, dashed_limit=GLUE_SHEAR_LIMIT)
+            annotate_point(ax2_2, glue_diagram.get_min_point(), f"Glue y={y_height} Min", is_max=False, dashed_limit=GLUE_SHEAR_LIMIT)
 
         ax2_2.set_ylabel("Glue Shear Stress (MPa)")
         ax2_2.set_title("Glue Joint Shear Stress Envelope")
         ax2_2.grid(True)
         ax2_2.legend(loc="upper right")
 
-        # 3. 中性轴处 Matboard 剪应力包络线及极限
+        # 3. 中性轴处 Matboard 剪应力包络线及极限 (标注 Max, Min 及 FOS)
         ax2_3.plot(y_bar_shear.x_values, y_bar_shear.y_values, label="Matboard Shear at y_bar", color="tab:olive", linewidth=1.5)
         ax2_3.axhline(y=MATBOARD_SHEAR_LIMIT, color='brown', linestyle='--', linewidth=1.5, label=f"Matboard Shear Limit ({MATBOARD_SHEAR_LIMIT} MPa)")
         ax2_3.axhline(y=-MATBOARD_SHEAR_LIMIT, color='brown', linestyle='--', linewidth=1.5)
+
+        annotate_point(ax2_3, y_bar_shear.get_max_point(), "Matboard Shear Max", is_max=True, dashed_limit=MATBOARD_SHEAR_LIMIT)
+        annotate_point(ax2_3, y_bar_shear.get_min_point(), "Matboard Shear Min", is_max=False, dashed_limit=MATBOARD_SHEAR_LIMIT)
 
         ax2_3.set_xlabel("Position x (mm)")
         ax2_3.set_ylabel("Matboard Shear Stress (MPa)")

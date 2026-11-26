@@ -61,7 +61,7 @@ class Rectangle:
             return True, POI[self.longer_axis], (right - left)
         return False, -1, 0
 
-    def calculate_buckle_strength(self, E: int = ELASTIC_MODULUS, poisson: float = POISSON):
+    def calculate_buckle_strength(self, y_bar: float, E: int = ELASTIC_MODULUS, poisson: float = POISSON):
         def buckling_formula(k: float, width: float, E: int = E, poisson: float = poisson):
             return k * (PI**2) * E /(12 * (1-poisson**2)) * ((self.thickness/width)**2)
         
@@ -86,7 +86,10 @@ class Rectangle:
             if eq(self.touches[i], self.touches[i+1]):
                 continue
 
-            min_compression_limit = min(min_compression_limit, buckling_formula(4 if self.longer_axis == 0 else 6, abs(self.touches[i] - self.touches[i+1])))
+            if self.longer_axis == 0:
+                min_compression_limit = min(min_compression_limit, buckling_formula(4, abs(self.touches[i] - self.touches[i+1])))
+            elif max(self.touches[i], self.touches[i+1]) > y_bar:
+                min_compression_limit = min(min_compression_limit, buckling_formula(6, abs(max(self.touches[i], y_bar) - max(self.touches[i+1], y_bar))))
             # if hotizontal then constant pressure, hence use k = 4
             # if vertical then linearly varying pressure, hence use k = 6
             # professor did not give formula for linearly varying pressure on boards with 3 restrained sides, hence neglect those

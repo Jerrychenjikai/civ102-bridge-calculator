@@ -110,7 +110,7 @@ def run_train():
     moment_constraints = []
     beam.cross_section.solve_touch()
     for i in beam.cross_section.matboards:
-        stress_limit = i.calculate_buckle_strength()
+        stress_limit = i.calculate_buckle_strength(beam.cross_section.y_bar)
         # stress = my/i
         # most compressed side is at the top
         y = (i.upper_bound() - beam.cross_section.y_bar)
